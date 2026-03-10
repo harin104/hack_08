@@ -1,0 +1,24 @@
+//VSAMDEF JOB (ACCT),'DVSAM',CLASS=A,MSGCLASS=A,NOTIFY=&SYSUID
+//*-----------------------------------------------------------------
+//* DELETE EXISITING FILE
+//*----------------------------------------------------------
+//STEPDEL EXEC PGM=IDCAMS
+//SYSPRINT DD SYSOUT=*
+//SYSIN DD *
+  DELETE Z71136.HARINI.KSDS.ACCTMST CLUSTER
+  SET MAXCC=0
+/*
+//*----------------------------------------------------------
+//* DEFINE VSAM
+//*-----------------------------------------------------
+//STEPDEF EXEC PGM=IDCAMS
+//SYSPRINT DD SYSOUT=*
+//SYSIN DD *
+  DEFINE CLUSTER(NAME(Z71136.HARINI.KSDS.ACCTMST) -
+                 INDEXED                     -
+                 KEYS(10 0)                  -
+                 RECORDSIZE(42 42)           -
+                 SHAREOPTIONS(2 3)            -
+                 DATA(NAME(Z71136.HARINI.KSDS.ACCTMST.DATA)) -
+                 INDEX(NAME(Z71136.HARINI.KSDS.ACCTMST.INDEX)))
+/*
