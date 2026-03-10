@@ -1,0 +1,115 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. ACTREACT.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT REACTIN
+               ASSIGN TO REACTIN
+               ORGANIZATION IS LINE SEQUENTIAL.
+
+           SELECT BANKACCT
+               ASSIGN TO BANKACCT
+               ORGANIZATION IS INDEXED
+               ACCESS MODE IS RANDOM
+               RECORD KEY IS ACC-NO
+               FILE STATUS IS FS-VSAM.
+
+       DATA DIVISION.
+
+       FILE SECTION.
+
+       FD REACTIN.
+       01 REACT-REC.
+           05 REACT-ACCNO     PIC X(10).
+           05 REACT-FEE       PIC 9(5)V99.
+
+       FD BANKACCT.
+       01 BANK-REC.
+           05 ACC-NO          PIC X(10).
+           05 ACC-NAME        PIC X(20).
+           05 ACC-STATUS      PIC X.
+           05 ACC-BAL         PIC 9(7)V99.
+
+       WORKING-STORAGE SECTION.
+
+       01 WS-EOF              PIC X VALUE 'N'.
+       01 WS-TOTAL            PIC 9(5) VALUE 0.
+       01 WS-REACT            PIC 9(5) VALUE 0.
+       01 WS-FAILED           PIC 9(5) VALUE 0.
+
+       01 FS-IN               PIC XX.
+       01 FS-VSAM             PIC XX.
+
+       PROCEDURE DIVISION.
+
+       1000-MAIN.
+           PERFORM 2000-OPEN-FILES
+           PERFORM 3000-PROCESS-RECORDS
+               UNTIL WS-EOF = 'Y'
+           PERFORM 4000-DISPLAY-SUMMARY
+           PERFORM 5000-CLOSE-FILES
+           STOP RUN.
+
+       2000-OPEN-FILES.
+           OPEN INPUT REACTIN
+                I-O BANKACCT
+
+           IF FS-VSAM NOT = '00'
+               DISPLAY 'ERROR OPENING VSAM FILE : ' FS-VSAM
+               MOVE 'Y' TO WS-EOF
+           END-IF.
+
+       3000-PROCESS-RECORDS.
+           READ REACTIN
+               AT END
+                   MOVE 'Y' TO WS-EOF
+               NOT AT END
+                   ADD 1 TO WS-TOTAL
+                   PERFORM 3100-PROCESS-ACCOUNT
+           END-READ.
+
+       3100-PROCESS-ACCOUNT.
+           MOVE REACT-ACCNO TO ACC-NO
+
+           READ BANKACCT
+               INVALID KEY
+                   DISPLAY 'ACCOUNT NOT FOUND : ' REACT-ACCNO
+                   ADD 1 TO WS-FAILED
+               NOT INVALID KEY
+                   PERFORM 3200-UPDATE-ACCOUNT
+           END-READ.
+
+       3200-UPDATE-ACCOUNT.
+           IF ACC-STATUS = 'I'
+               PERFORM 3300-REACTIVATE
+           ELSE
+               DISPLAY 'ACCOUNT ALREADY ACTIVE : ' ACC-NO
+               ADD 1 TO WS-FAILED
+           END-IF.
+
+       3300-REACTIVATE.
+           SUBTRACT REACT-FEE FROM ACC-BAL
+           MOVE 'A' TO ACC-STATUS
+           REWRITE BANK-REC
+
+           IF FS-VSAM = '00'
+               ADD 1 TO WS-REACT
+           ELSE
+               DISPLAY 'REWRITE FAILED : ' FS-VSAM
+               ADD 1 TO WS-FAILED
+           END-IF.
+
+       4000-DISPLAY-SUMMARY.
+           DISPLAY '----------------------------------------'
+           DISPLAY 'ACCOUNT REACTIVATION SUMMARY'
+           DISPLAY '----------------------------------------'
+           DISPLAY 'ACCOUNTS PROCESSED       : ' WS-TOTAL
+           DISPLAY 'REACTIVATED              : ' WS-REACT
+           DISPLAY 'FAILED ATTEMPTS          : ' WS-FAILED
+           DISPLAY 'BATCH COMPLETED SUCCESSFULLY'.
+
+       5000-CLOSE-FILES.
+           CLOSE REACTIN
+                 BANKACCT.
